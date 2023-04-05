@@ -36,6 +36,7 @@ private[sql] class ProtobufOptions(
     this(CaseInsensitiveMap(parameters), conf)
   }
 
+
   val parseMode: ParseMode =
     parameters.get("mode").map(ParseMode.fromString).getOrElse(FailFastMode)
 
@@ -46,9 +47,35 @@ private[sql] class ProtobufOptions(
   // record has more depth than the allowed value for recursive fields, it will be truncated
   // and corresponding fields are ignored (dropped).
   val recursiveFieldMaxDepth: Int = parameters.getOrElse("recursive.fields.max.depth", "-1").toInt
+
+  // Whether or not to explicitly materialize the zero values when deserializing protobufs.
+  // For example, if we have a proto like
+  // ```
+  // syntax = "proto3";
+  // message Example {
+  //   string s = 1;
+  //   int64 i = 2;
+  // }
+  // ```
+  //
+  // And we have the serialized representation of the following proto:
+  // `Example(s="", i=0)`
+  //
+  // The result after calling from_protobuf would be:
+  // `{"s": null, "i": null}`
+  //
+  // Many proto3 readers in other languages will return the default values rather than null,
+  // so it may be useful in some contexts to materialize these zero values when deserializing,
+  // like so:
+  // `{"s": "", "i": 0}`
+  //
+  // This behavior can be enabled with this flag.
+  val materializeZeroValues: Boolean =
+    parameters.getOrElse(ProtobufOptions.materializeZeroValues, false.toString).toBoolean
 }
 
 private[sql] object ProtobufOptions {
+  val materializeZeroValues = "materializeZeroValues"
   def apply(parameters: Map[String, String]): ProtobufOptions = {
     val hadoopConf = SparkSession.getActiveSession
       .map(_.sessionState.newHadoopConf())

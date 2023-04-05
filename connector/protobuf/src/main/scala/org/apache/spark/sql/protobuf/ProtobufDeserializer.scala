@@ -36,10 +36,11 @@ import org.apache.spark.unsafe.types.UTF8String
 private[sql] class ProtobufDeserializer(
     rootDescriptor: Descriptor,
     rootCatalystType: DataType,
-    filters: StructFilters) {
+    filters: StructFilters,
+    materializeZeroValues: Boolean = false) {
 
   def this(rootDescriptor: Descriptor, rootCatalystType: DataType) = {
-    this(rootDescriptor, rootCatalystType, new NoopFilters)
+    this(rootDescriptor, rootCatalystType, new NoopFilters, false)
   }
 
   private val converter: Any => Option[InternalRow] =
@@ -288,7 +289,21 @@ private[sql] class ProtobufDeserializer(
       var skipRow = false
       while (i < validFieldIndexes.length && !skipRow) {
         val field = validFieldIndexes(i)
-        val value = if (field.isRepeated || field.hasDefaultValue || record.hasField(field)) {
+
+        // If `materializeZeroValues` is true, the written field will contain the
+        // default zero value for its type (e.g. 0 for int, "" for string, etc:
+        // https://protobuf.dev/programming-guides/proto3/#default).
+        // Otherwise, the field will be null unless the serialized proto explicitly
+        // contains the field, or it has an explicit default (
+        // proto2 only https://protobuf.dev/programming-guides/proto2/#optional)
+        // Note that in proto3, the serialized proto will not contain the field
+        // if the value was explicitly set to its zero value. See:
+        // https://protobuf.dev/programming-guides/field_presence/#presence-in-proto3-apis
+        val value = if (this.materializeZeroValues) {
+          // `getField` will return the default value for the field type if the field
+          // is not present.
+          record.getField(field)
+        } else if (field.isRepeated || field.hasDefaultValue || record.hasField(field)) {
           record.getField(field)
         } else null
         fieldWriters(i)(fieldUpdater, value)
