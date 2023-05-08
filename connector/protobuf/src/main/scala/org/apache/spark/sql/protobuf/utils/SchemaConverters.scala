@@ -19,6 +19,7 @@ package org.apache.spark.sql.protobuf.utils
 import scala.collection.JavaConverters._
 
 import com.google.protobuf.Descriptors.{Descriptor, FieldDescriptor}
+import com.google.protobuf.WireFormat
 
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.internal.Logging
@@ -68,8 +69,22 @@ object SchemaConverters extends Logging {
       protobufOptions: ProtobufOptions): Option[StructField] = {
     import com.google.protobuf.Descriptors.FieldDescriptor.JavaType._
     val dataType = fd.getJavaType match {
-      case INT => Some(IntegerType)
-      case LONG => Some(LongType)
+
+      // Convert uint32 to Long type so that large values do not overflow signed
+      // integer.
+      case INT => if (fd.getLiteType == WireFormat.FieldType.UINT32) {
+        Some(LongType)
+      } else {
+        Some(IntegerType)
+      }
+
+      // Convert uint64 to Decimal(20,0) so that large values do not overflow
+      // Long, which is signed.
+      case LONG => if (fd.getLiteType == WireFormat.FieldType.UINT64) {
+        Some(DecimalType.LongDecimal)
+      } else {
+        Some(LongType)
+      }
       case FLOAT => Some(FloatType)
       case DOUBLE => Some(DoubleType)
       case BOOLEAN => Some(BooleanType)

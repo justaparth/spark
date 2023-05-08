@@ -185,6 +185,12 @@ private[sql] class ProtobufDeserializer(
       case (INT, ShortType) =>
         (updater, ordinal, value) => updater.setShort(ordinal, value.asInstanceOf[Short])
 
+      case (INT, LongType) =>
+        (updater, ordinal, value) => updater.setLong(
+          ordinal,
+           UTF8String.fromString(
+             java.lang.Integer.toUnsignedString(value.asInstanceOf[Int])).toLongExact)
+
       case  (
         MESSAGE | BOOLEAN | INT | FLOAT | DOUBLE | LONG | STRING | ENUM | BYTE_STRING,
         ArrayType(dataType: DataType, containsNull)) if protoType.isRepeated =>
@@ -192,6 +198,13 @@ private[sql] class ProtobufDeserializer(
 
       case (LONG, LongType) =>
         (updater, ordinal, value) => updater.setLong(ordinal, value.asInstanceOf[Long])
+
+      case (LONG, DecimalType.LongDecimal) =>
+        (updater, ordinal, value) =>
+          updater.setDecimal(
+            ordinal,
+            Decimal.fromString(
+              UTF8String.fromString(java.lang.Long.toUnsignedString(value.asInstanceOf[Long]))))
 
       case (FLOAT, FloatType) =>
         (updater, ordinal, value) => updater.setFloat(ordinal, value.asInstanceOf[Float])
