@@ -68,11 +68,14 @@ object SchemaConverters extends Logging {
       existingRecordNames: Map[String, Int],
       protobufOptions: ProtobufOptions): Option[StructField] = {
     import com.google.protobuf.Descriptors.FieldDescriptor.JavaType._
+
+    val unsignedAsPrimitive = protobufOptions.unsignedAsSignedPrimitive
+
     val dataType = fd.getJavaType match {
 
       // Convert uint32 to Long type so that large values do not overflow signed
       // integer.
-      case INT => if (fd.getLiteType == WireFormat.FieldType.UINT32) {
+      case INT => if (fd.getLiteType == WireFormat.FieldType.UINT32 && !unsignedAsPrimitive) {
         Some(LongType)
       } else {
         Some(IntegerType)
@@ -80,7 +83,7 @@ object SchemaConverters extends Logging {
 
       // Convert uint64 to Decimal(20,0) so that large values do not overflow
       // Long, which is signed.
-      case LONG => if (fd.getLiteType == WireFormat.FieldType.UINT64) {
+      case LONG => if (fd.getLiteType == WireFormat.FieldType.UINT64 && !unsignedAsPrimitive) {
         Some(DecimalType.LongDecimal)
       } else {
         Some(LongType)

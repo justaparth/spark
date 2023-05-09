@@ -323,3 +323,8 @@ message Proto3AllTypes {
   }
   map<string, string> map = 13;
 }
+
+message UnsignedTypes {
+  uint32 uint32_value = 1;
+  uint64 uint64_value = 2;
+}
